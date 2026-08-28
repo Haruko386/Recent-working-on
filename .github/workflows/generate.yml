@@ -1,0 +1,73 @@
+name: Generate contribution life game
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: GitHub username (defaults to the repository owner)
+        required: false
+        type: string
+      theme:
+        description: SVG color theme
+        required: false
+        default: green
+        type: choice
+        options:
+          - green
+          - ocean
+          - purple
+      max_generations:
+        description: Reset after this many generations if cells are still alive
+        required: false
+        default: '60'
+        type: string
+  schedule:
+    - cron: '17 0 * * *'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lifegame-svg
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      INPUT_USERNAME: ${{ inputs.username || github.repository_owner }}
+      INPUT_THEME: ${{ inputs.theme || 'green' }}
+      INPUT_MAX_GENERATIONS: ${{ inputs.max_generations || '60' }}
+      INPUT_OUTPUT: dist/lifegame.svg
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Test
+        run: npm test
+
+      - name: Generate SVG
+        run: npm run generate
+
+      - name: Publish output branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: output-lifegame
+          publish_dir: ./dist
+          force_orphan: true
+          enable_jekyll: false
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com

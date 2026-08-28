@@ -1,0 +1,14 @@
+{
+  "name": "lifegame-profile-readme",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn a GitHub contribution calendar into an animated Conway's Game of Life SVG.",
+  "scripts": {
+    "generate": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
