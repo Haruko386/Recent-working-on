@@ -1,26 +1,30 @@
-name: Generate contribution life game
+name: Generate repository activity card
 
 on:
   workflow_dispatch:
     inputs:
-      username:
-        description: GitHub username (defaults to the repository owner)
+      repository:
+        description: Repository to display (OWNER/REPO)
+        required: true
+        default: Haruko386/FunPDF
+        type: string
+      timezone:
+        description: IANA time zone used to define yesterday
+        required: true
+        default: Asia/Shanghai
+        type: string
+      date:
+        description: Optional YYYY-MM-DD override (blank means yesterday)
         required: false
         type: string
       theme:
         description: SVG color theme
-        required: false
-        default: green
+        required: true
+        default: light
         type: choice
         options:
-          - green
-          - ocean
-          - purple
-      max_generations:
-        description: Reset after this many generations if cells are still alive
-        required: false
-        default: '60'
-        type: string
+          - light
+          - dark
   schedule:
     - cron: '17 0 * * *'
   push:
@@ -31,21 +35,24 @@ on:
 
 permissions:
   contents: write
+  issues: read
+  pull-requests: read
 
 concurrency:
-  group: lifegame-svg
+  group: repository-activity-card
   cancel-in-progress: true
 
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
-      INPUT_USERNAME: ${{ inputs.username || github.repository_owner }}
-      INPUT_THEME: ${{ inputs.theme || 'green' }}
-      INPUT_MAX_GENERATIONS: ${{ inputs.max_generations || '60' }}
-      INPUT_OUTPUT: dist/lifegame.svg
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      INPUT_REPOSITORY: ${{ inputs.repository || 'Haruko386/FunPDF' }}
+      INPUT_TIMEZONE: ${{ inputs.timezone || 'Asia/Shanghai' }}
+      INPUT_DATE: ${{ inputs.date || '' }}
+      INPUT_THEME: ${{ inputs.theme || 'light' }}
+      INPUT_OUTPUT: dist/repository-card.svg
+      REPOSITORY_TOKEN: ${{ secrets.REPOSITORY_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -58,14 +65,14 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Generate SVG
+      - name: Generate repository card
         run: npm run generate
 
       - name: Publish output branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_branch: output-lifegame
+          publish_branch: output-repository-card
           publish_dir: ./dist
           force_orphan: true
           enable_jekyll: false

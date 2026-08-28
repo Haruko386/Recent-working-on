@@ -1,55 +1,57 @@
-# Contribution Life Game
+# Repository Activity Card
 
-把 GitHub 最近一年的贡献日历变成 Conway's Game of Life SVG 动画，并由 GitHub Actions 每天发布到 `output-lifegame` 分支。
+每天把指定 GitHub 仓库“昨天”的开发活动生成成适合放在 Profile README 中的 SVG 卡片。
 
-生成器会按贡献数从高到低排列日期；贡献数相同时使用每日变化的随机种子打乱顺序，再取前 3 天作为初始活细胞。细胞遵循标准生命游戏规则（B3/S23，网格外视为死亡）。全部细胞死亡后动画回到起点；若一直存活，则在达到 `max-generations` 后回到起点。
+卡片包含仓库所有者头像、仓库名、简介、Open Issues、Open PRs、昨日提交数、增删行数、按小时统计的代码变化与提交活动，以及仓库主要语言。语言标签采用紧凑的小尺寸展示，图表带轻量进入动画，并适配系统的“减少动态效果”设置。
 
-## 使用
+## 使用 GitHub Actions
 
-1. 将仓库的默认分支命名为 `main`，并把这些文件推送到 GitHub。
-2. 打开仓库的 **Actions → Generate contribution life game → Run workflow**，首次手动运行。
-3. Action 会创建仅包含生成产物的 `output-lifegame` 分支。之后每天 UTC 00:17 自动更新。
-4. 在你的个人 Profile README 中引用：
+1. 将本项目的全部文件推送到 GitHub，不能只复制工作流文件；仓库根目录必须包含 `package.json`、`src/` 和 `test/`。
+2. 打开 **Actions → Generate repository activity card → Run workflow**。
+3. 在 `repository` 中填写 `OWNER/REPO`，例如 `Haruko386/FunPDF` 或 `infiniflow/ragflow`。
+4. Action 会把 `repository-card.svg` 发布到孤立的 `output-repository-card` 分支，并在每天 UTC 00:17 自动更新。
 
-```md
-![My contribution Game of Life](https://raw.githubusercontent.com/<OWNER>/<REPO>/output-lifegame/lifegame.svg)
-```
-
-把 `<OWNER>/<REPO>` 换成实际仓库，例如：
+在 Profile README 中引用：
 
 ```md
-![My contribution Game of Life](https://raw.githubusercontent.com/Haruko386-UnOffical/lifegame-profile-readme/output-lifegame/lifegame.svg)
+![Repository activity](https://raw.githubusercontent.com/<CARD_OWNER>/<CARD_REPO>/output-repository-card/repository-card.svg)
 ```
 
-仓库的 **Settings → Actions → General → Workflow permissions** 需要允许 **Read and write permissions**。工作流使用内置的 `GITHUB_TOKEN`，不需要额外创建 PAT；私有贡献是否计入取决于 GitHub 账户的贡献可见性设置。
+仓库的 **Settings → Actions → General → Workflow permissions** 需要设为 **Read and write permissions**，以便创建输出分支。
 
-## 配置
+## 公开、私有和组织仓库权限
 
-手动运行 Action 时可以设置：
+- 公开仓库通常可直接使用 Action 自动提供的 `GITHUB_TOKEN`，包括公开组织仓库。
+- 对于私有仓库、组织限制访问的仓库或跨仓库权限不足的情况，请创建仅授权目标仓库的 fine-grained PAT，并给予 Contents、Issues、Pull requests 的只读权限（Metadata 会自动包含），然后在运行本项目的仓库中添加名为 `REPOSITORY_TOKEN` 的 Actions Secret。
+- 不要把 PAT 填入工作流输入框、代码或 README。工作流会优先使用 `REPOSITORY_TOKEN`，否则回退到内置 `GITHUB_TOKEN`。
+- 输出 SVG 会公开显示统计结果；不要把私有仓库的卡片发布到公开输出分支，除非你确认这些信息可以公开。
 
-- `username`：要读取的 GitHub 用户，默认为仓库所有者。
-- `theme`：`green`、`ocean` 或 `purple`。
-- `max_generations`：仍有细胞存活时的最大演化代数，默认 60。
+## 参数
 
-本地运行需要 Node.js 20+（Action 使用 Node.js 24）和一个可读取公开用户资料的 GitHub Token：
+- `repository`：目标仓库，必须为 `OWNER/REPO`。
+- `timezone`：用于划分“昨天”的 IANA 时区，默认 `Asia/Shanghai`。
+- `date`：可选的 `YYYY-MM-DD`，用于重新生成指定日期；留空时自动选择昨天。
+- `theme`：`light` 或 `dark`。
+
+代码增删与提交数来自目标仓库默认分支。一次合并提交展示的是 GitHub 对该提交计算的 additions/deletions；语言数据是当前仓库整体语言组成，不是仅统计昨天修改过的文件。
+
+## 本地运行
+
+需要 Node.js 20+ 和 GitHub Token：
 
 ```powershell
 $env:GH_TOKEN = 'github_pat_xxx'
 npm test
-npm run generate -- --username octocat --theme ocean --max-generations 60
+npm run generate -- --repository Haruko386/FunPDF --timezone Asia/Shanghai
 ```
 
-结果位于 `dist/lifegame.svg`。可额外使用 `--seed` 固定并列日期的选择结果，或用 `--frame-ms` 调整每帧毫秒数。
+也可以固定日期和主题：
 
-## 目录
-
-```text
-src/contributions.js  GitHub GraphQL 数据获取与起点选择
-src/lifegame.js       B3/S23 演化逻辑
-src/svg.js            无 JavaScript 的 CSS 动画 SVG 渲染
-src/index.js          命令行入口
-test/                 Node.js 内置测试
+```powershell
+npm run generate -- --repository infiniflow/ragflow --date 2026-08-27 --theme dark
 ```
+
+结果输出到 `dist/repository-card.svg`。
 
 ## License
 

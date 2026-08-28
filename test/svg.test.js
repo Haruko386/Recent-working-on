@@ -1,21 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderSvg } from '../src/svg.js';
+import { buildHourlyStats, renderSvg } from '../src/svg.js';
 
-test('renders accessible, animated SVG without script', () => {
-  const svg = renderSvg({
-    calendar: {
-      width: 2,
-      height: 7,
-      totalContributions: 4,
-      days: [{ x: 0, y: 0, date: '2026-01-01', count: 4 }]
-    },
-    username: 'octo<&>',
-    selectedDays: [{ x: 0, y: 0, date: '2026-01-01', count: 4 }],
-    simulation: { frames: [new Set(['0,0']), new Set()], reason: 'extinct' }
-  });
-  assert.match(svg, /@keyframes lifegame/);
-  assert.match(svg, /prefers-reduced-motion/);
-  assert.match(svg, /octo&lt;&amp;&gt;/);
+const activity = {
+  nameWithOwner: 'Haruko386/FunPDF', owner: 'Haruko386', name: 'FunPDF', description: 'A <colorful> & helpful reader',
+  defaultBranch: 'main', openIssues: 2, openPullRequests: 1,
+  languages: [{ name: 'Vue', color: '#41b883', percentage: 0.7 }, { name: 'Go', color: '#00add8', percentage: 0.3 }],
+  commits: [{ committedDate: '2026-08-27T02:30:00Z', additions: 12, deletions: 3 }]
+};
+const range = { label: '2026-08-27', timeZone: 'Asia/Shanghai' };
+
+test('groups commit changes by local hour', () => {
+  const hourly = buildHourlyStats(activity.commits, range.timeZone);
+  assert.deepEqual(hourly[10], { hour: 10, commits: 1, additions: 12, deletions: 3 });
+});
+
+test('renders an accessible animated SVG with compact language chips', () => {
+  const svg = renderSvg({ activity, range, avatarDataUrl: 'data:image/png;base64,AAAA' });
+  assert.match(svg, /Yesterday commits/);
+  assert.match(svg, /Code changes by hour/);
+  assert.match(svg, /font-size: 12px/);
+  assert.match(svg, /@keyframes grow/);
+  assert.match(svg, /A &lt;colorful&gt; &amp; helpful reader/);
   assert.doesNotMatch(svg, /<script/);
 });

@@ -1,9 +1,9 @@
 {
-  "name": "lifegame-profile-readme",
-  "version": "1.0.0",
+  "name": "repository-activity-card",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Turn a GitHub contribution calendar into an animated Conway's Game of Life SVG.",
+  "description": "Generate a daily SVG card from a GitHub repository's previous-day activity.",
   "scripts": {
     "generate": "node src/index.js",
     "test": "node --test"
