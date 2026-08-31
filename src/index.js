@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import process from 'node:process';
-import { previousDayRange } from './date.js';
+import { recentDayRange } from './date.js';
 import { fetchImageDataUrl, fetchRepositoryActivity } from './github.js';
 import { availableThemes, renderSvg } from './svg.js';
 
@@ -25,6 +25,7 @@ async function main() {
   const token = args.token ?? process.env.REPOSITORY_TOKEN ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   const timeZone = args.timezone ?? process.env.INPUT_TIMEZONE ?? 'Asia/Shanghai';
   const date = args.date ?? process.env.INPUT_DATE ?? undefined;
+  const days = Number(args.days ?? process.env.INPUT_DAYS ?? 15);
   const theme = args.theme ?? process.env.INPUT_THEME ?? 'light';
   const output = args.output ?? process.env.INPUT_OUTPUT ?? 'dist/repository-card.svg';
 
@@ -32,7 +33,7 @@ async function main() {
   if (!token) throw new Error('A GitHub token is required. Set REPOSITORY_TOKEN, GH_TOKEN, or GITHUB_TOKEN.');
   if (!availableThemes.includes(theme)) throw new Error(`theme must be one of: ${availableThemes.join(', ')}.`);
 
-  const range = previousDayRange({ timeZone, date });
+  const range = recentDayRange({ timeZone, date, days });
   console.log(`Fetching ${repository} activity from ${range.since} to ${range.until}...`);
   const activity = await fetchRepositoryActivity({ repository, token, since: range.since, until: range.until });
   const avatarDataUrl = await fetchImageDataUrl(activity.avatarUrl);

@@ -75,7 +75,28 @@ export function previousDayRange({ now = new Date(), timeZone = 'Asia/Shanghai',
   };
 }
 
-export function hourInTimeZone(isoDate, timeZone) {
-  const hour = zonedParts(new Date(isoDate), timeZone).hour;
-  return hour === 24 ? 0 : hour;
+export function recentDayRange({ now = new Date(), timeZone = 'Asia/Shanghai', date, days = 15 } = {}) {
+  if (!Number.isInteger(days) || days < 1 || days > 15) {
+    throw new Error('days must be an integer from 1 to 15.');
+  }
+
+  const endDay = previousDayRange({ now, timeZone, date });
+  const target = parseDate(endDay.label);
+  const labels = Array.from({ length: days }, (_, index) => {
+    const value = new Date(Date.UTC(target.year, target.month - 1, target.day) - (days - 1 - index) * 86_400_000);
+    return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+  });
+  const start = parseDate(labels[0]);
+
+  return {
+    ...endDay,
+    since: zonedMidnight(start, timeZone).toISOString(),
+    days,
+    labels
+  };
+}
+
+export function dateInTimeZone(isoDate, timeZone) {
+  const parts = zonedParts(new Date(isoDate), timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }

@@ -1,4 +1,4 @@
-import { hourInTimeZone } from './date.js';
+import { dateInTimeZone } from './date.js';
 
 const THEMES = {
   light: {
@@ -28,69 +28,79 @@ function formatNumber(value) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-export function buildHourlyStats(commits, timeZone) {
-  const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, commits: 0, additions: 0, deletions: 0 }));
+export function buildDailyStats(commits, range) {
+  const days = range.labels.map((date) => ({ date, commits: 0, additions: 0, deletions: 0 }));
+  const byDate = new Map(days.map((day) => [day.date, day]));
   for (const commit of commits) {
-    const bucket = hours[hourInTimeZone(commit.committedDate, timeZone)];
+    const bucket = byDate.get(dateInTimeZone(commit.committedDate, range.timeZone));
+    if (!bucket) continue;
     bucket.commits += 1;
     bucket.additions += commit.additions;
     bucket.deletions += commit.deletions;
   }
-  return hours;
+  return days;
 }
 
 function metric(x, value, label, palette, valueColor = palette.foreground) {
   return `<g text-anchor="middle"><text x="${x}" y="154" class="metric" fill="${valueColor}">${escapeXml(value)}</text><text x="${x}" y="178" class="label" fill="${palette.muted}">${escapeXml(label)}</text></g>`;
 }
 
-function changeChart(hourly, palette) {
+function chartLabels(daily, x, width, palette) {
+  const indexes = [...new Set([0, Math.floor((daily.length - 1) / 2), daily.length - 1])];
+  return indexes.map((index) => {
+    const position = daily.length === 1 ? x + width / 2 : x + (index + 0.5) * width / daily.length;
+    return `<text x="${position.toFixed(2)}" y="400" class="axis" fill="${palette.muted}" text-anchor="middle">${daily[index].date.slice(5)}</text>`;
+  }).join('');
+}
+
+function changeChart(daily, palette) {
   const x = 54;
   const width = 500;
   const top = 237;
   const zero = 320;
   const bottom = 382;
-  const maxAdditions = Math.max(1, ...hourly.map(({ additions }) => additions));
-  const maxDeletions = Math.max(1, ...hourly.map(({ deletions }) => deletions));
-  const slot = width / 24;
-  const barWidth = Math.max(2, slot - 4);
-  const bars = hourly.map((item, index) => {
+  const maxAdditions = Math.max(1, ...daily.map(({ additions }) => additions));
+  const maxDeletions = Math.max(1, ...daily.map(({ deletions }) => deletions));
+  const slot = width / daily.length;
+  const barWidth = Math.max(3, slot - 7);
+  const bars = daily.map((item, index) => {
     const barX = x + index * slot + 2;
     const additionHeight = item.additions ? Math.max(2, item.additions / maxAdditions * (zero - top - 8)) : 0;
     const deletionHeight = item.deletions ? Math.max(2, item.deletions / maxDeletions * (bottom - zero - 7)) : 0;
-    const addition = additionHeight ? `<rect class="bar addition" x="${barX.toFixed(2)}" y="${(zero - additionHeight).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${additionHeight.toFixed(2)}" rx="1"><title>${String(item.hour).padStart(2, '0')}:00 · +${item.additions}</title></rect>` : '';
-    const deletion = deletionHeight ? `<rect class="bar deletion" x="${barX.toFixed(2)}" y="${zero}" width="${barWidth.toFixed(2)}" height="${deletionHeight.toFixed(2)}" rx="1"><title>${String(item.hour).padStart(2, '0')}:00 · -${item.deletions}</title></rect>` : '';
+    const addition = additionHeight ? `<rect class="bar addition" x="${barX.toFixed(2)}" y="${(zero - additionHeight).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${additionHeight.toFixed(2)}" rx="1"><title>${item.date} · +${item.additions}</title></rect>` : '';
+    const deletion = deletionHeight ? `<rect class="bar deletion" x="${barX.toFixed(2)}" y="${zero}" width="${barWidth.toFixed(2)}" height="${deletionHeight.toFixed(2)}" rx="1"><title>${item.date} · -${item.deletions}</title></rect>` : '';
     return addition + deletion;
   }).join('');
 
   return `<g>
-    <text x="${x + width / 2}" y="211" class="chart-title" fill="${palette.foreground}" text-anchor="middle">Code changes by hour</text>
-    <text x="${x}" y="228" class="chart-note" fill="${palette.muted}">Additions and deletions on the default branch</text>
+    <text x="${x + width / 2}" y="211" class="chart-title" fill="${palette.foreground}" text-anchor="middle">Code changes by day</text>
+    <text x="${x}" y="228" class="chart-note" fill="${palette.muted}">Additions and deletions · latest ${daily.length} complete days</text>
     <line x1="${x}" y1="${zero}" x2="${x + width}" y2="${zero}" stroke="${palette.grid}"/>
     <line x1="${x}" y1="${bottom}" x2="${x + width}" y2="${bottom}" stroke="${palette.foreground}" stroke-width="1.5"/>
-    <text x="${x}" y="400" class="axis" fill="${palette.muted}">00:00</text><text x="${x + width}" y="400" class="axis" fill="${palette.muted}" text-anchor="end">24:00</text>
+    ${chartLabels(daily, x, width, palette)}
     <g>${bars}</g>
   </g>`;
 }
 
-function commitChart(hourly, palette) {
+function commitChart(daily, palette) {
   const x = 600;
   const width = 346;
   const top = 237;
   const bottom = 382;
-  const maximum = Math.max(1, ...hourly.map(({ commits }) => commits));
-  const slot = width / 24;
-  const barWidth = Math.max(2, slot - 4);
-  const bars = hourly.map((item, index) => {
+  const maximum = Math.max(1, ...daily.map(({ commits }) => commits));
+  const slot = width / daily.length;
+  const barWidth = Math.max(3, slot - 7);
+  const bars = daily.map((item, index) => {
     if (!item.commits) return '';
     const height = Math.max(3, item.commits / maximum * (bottom - top - 7));
-    return `<rect class="bar commit" x="${(x + index * slot + 2).toFixed(2)}" y="${(bottom - height).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="1"><title>${String(item.hour).padStart(2, '0')}:00 · ${item.commits} commit${item.commits === 1 ? '' : 's'}</title></rect>`;
+    return `<rect class="bar commit" x="${(x + index * slot + 2).toFixed(2)}" y="${(bottom - height).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${height.toFixed(2)}" rx="1"><title>${item.date} · ${item.commits} commit${item.commits === 1 ? '' : 's'}</title></rect>`;
   }).join('');
 
   return `<g>
-    <text x="${x + width / 2}" y="211" class="chart-title" fill="${palette.foreground}" text-anchor="middle">Commits by hour</text>
-    <text x="${x}" y="228" class="chart-note" fill="${palette.muted}">Commit activity in the selected time zone</text>
+    <text x="${x + width / 2}" y="211" class="chart-title" fill="${palette.foreground}" text-anchor="middle">Commits by day</text>
+    <text x="${x}" y="228" class="chart-note" fill="${palette.muted}">Commit activity · latest ${daily.length} complete days</text>
     <line x1="${x}" y1="${bottom}" x2="${x + width}" y2="${bottom}" stroke="${palette.foreground}" stroke-width="1.5"/>
-    <text x="${x}" y="400" class="axis" fill="${palette.muted}">00:00</text><text x="${x + width}" y="400" class="axis" fill="${palette.muted}" text-anchor="end">24:00</text>
+    ${chartLabels(daily, x, width, palette)}
     <g>${bars}</g>
   </g>`;
 }
@@ -125,19 +135,20 @@ function languageSection(languages, palette) {
 export function renderSvg({ activity, range, avatarDataUrl, theme = 'light' }) {
   const palette = THEMES[theme];
   if (!palette) throw new Error(`Unknown theme "${theme}". Choose one of: ${Object.keys(THEMES).join(', ')}.`);
-  const hourly = buildHourlyStats(activity.commits, range.timeZone);
-  const additions = activity.commits.reduce((sum, commit) => sum + commit.additions, 0);
-  const deletions = activity.commits.reduce((sum, commit) => sum + commit.deletions, 0);
+  const daily = buildDailyStats(activity.commits, range);
+  const yesterday = daily.at(-1);
+  const additions = yesterday.additions;
+  const deletions = yesterday.deletions;
   const avatar = avatarDataUrl
     ? `<image href="${avatarDataUrl}" x="45" y="34" width="64" height="64" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatar-clip)"/>`
     : `<circle cx="77" cy="66" r="32" fill="${palette.grid}"/><text x="77" y="73" text-anchor="middle" font-size="22" fill="${palette.muted}">${escapeXml(activity.owner.slice(0, 1).toUpperCase())}</text>`;
   const emptyMessage = activity.commits.length === 0
-    ? `<text x="500" y="307" text-anchor="middle" class="empty" fill="${palette.muted}">No commits on ${range.label}</text>`
+    ? `<text x="500" y="307" text-anchor="middle" class="empty" fill="${palette.muted}">No commits in the displayed period</text>`
     : '';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500" viewBox="0 0 1000 500" role="img" aria-labelledby="title description">
   <title id="title">${escapeXml(activity.nameWithOwner)} repository activity for ${range.label}</title>
-  <desc id="description">${activity.commits.length} commits, ${additions} additions, ${deletions} deletions. Generated for ${range.timeZone}.</desc>
+  <desc id="description">${yesterday.commits} commits, ${additions} additions, ${deletions} deletions on ${range.label}; charts show ${daily.length} days. Generated for ${range.timeZone}.</desc>
   <defs>
     <clipPath id="avatar-clip"><circle cx="77" cy="66" r="32"/></clipPath>
     <clipPath id="language-bar"><rect x="54" y="423" width="892" height="7" rx="3.5"/></clipPath>
@@ -160,12 +171,12 @@ export function renderSvg({ activity, range, avatarDataUrl, theme = 'light' }) {
   <text x="46" y="123" class="description" fill="${palette.foreground}">${escapeXml(truncate(activity.description, 104))}</text>
   <g text-anchor="middle"><text x="862" y="57" class="small-number" fill="${palette.foreground}">${activity.openIssues}</text><text x="862" y="78" class="small-stat" fill="${palette.muted}">◉ Open Issues</text></g>
   <g text-anchor="middle"><text x="948" y="57" class="small-number" fill="${palette.foreground}">${activity.openPullRequests}</text><text x="948" y="78" class="small-stat" fill="${palette.muted}">⑂ Open PRs</text></g>
-  ${metric(175, formatNumber(activity.commits.length), 'Yesterday commits', palette)}
+  ${metric(175, formatNumber(yesterday.commits), 'Yesterday commits', palette)}
   ${metric(378, `+${formatNumber(additions)}`, 'Lines added', palette, palette.addition)}
   ${metric(570, `−${formatNumber(deletions)}`, 'Lines deleted', palette, palette.deletion)}
   ${metric(795, range.label, range.timeZone, palette)}
-  ${changeChart(hourly, palette)}
-  ${commitChart(hourly, palette)}
+  ${changeChart(daily, palette)}
+  ${commitChart(daily, palette)}
   ${emptyMessage}
   ${languageSection(activity.languages, palette)}
   <text x="946" y="482" text-anchor="end" class="axis" fill="${palette.muted}">default: ${escapeXml(activity.defaultBranch ?? 'none')} · repository activity card</text>
