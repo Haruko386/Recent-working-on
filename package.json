@@ -5,7 +5,6 @@
   "type": "module",
   "description": "Generate a daily SVG card from a GitHub repository's previous-day activity.",
   "scripts": {
-    "generate": "node src/index.js",
     "test": "node --test"
   },
   "engines": {

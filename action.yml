@@ -1,0 +1,63 @@
+name: Repository Activity Card
+description: Generate and publish a daily SVG activity card for any accessible GitHub repository.
+author: Haruko386
+
+branding:
+  icon: bar-chart-2
+  color: blue
+
+inputs:
+  repository:
+    description: Target repository in OWNER/REPO format.
+    required: true
+  token:
+    description: Optional token for reading a private or restricted target repository.
+    required: false
+    default: ''
+  timezone:
+    description: IANA time zone used to determine complete calendar days.
+    required: false
+    default: Asia/Shanghai
+  days:
+    description: Number of complete days shown, from 1 to 15.
+    required: false
+    default: '15'
+  theme:
+    description: Card theme, light or dark.
+    required: false
+    default: light
+  output-branch:
+    description: Branch that receives the generated SVG.
+    required: false
+    default: output-repository-card
+  output-file:
+    description: SVG filename in the output branch.
+    required: false
+    default: repository-card.svg
+
+outputs:
+  image-url:
+    description: Raw URL of the generated SVG.
+    value: ${{ steps.generate.outputs.image-url }}
+  branch:
+    description: Branch containing the generated SVG.
+    value: ${{ steps.generate.outputs.branch }}
+
+runs:
+  using: composite
+  steps:
+    - id: generate
+      name: Generate and publish repository activity card
+      shell: bash
+      env:
+        CARD_REPOSITORY: ${{ inputs.repository }}
+        CARD_READ_TOKEN: ${{ inputs.token || github.token }}
+        CARD_PUBLISH_TOKEN: ${{ github.token }}
+        CARD_DESTINATION_REPOSITORY: ${{ github.repository }}
+        CARD_TIMEZONE: ${{ inputs.timezone }}
+        CARD_DAYS: ${{ inputs.days }}
+        CARD_THEME: ${{ inputs.theme }}
+        CARD_OUTPUT_BRANCH: ${{ inputs.output-branch }}
+        CARD_OUTPUT_FILE: ${{ inputs.output-file }}
+        CARD_ACTION_PATH: ${{ github.action_path }}
+      run: node "$CARD_ACTION_PATH/src/action.js"
